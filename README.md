@@ -39,7 +39,7 @@ residue_to_copy = system.get_residue_by_name('DOPC')[0]
 residue_to_copy.copy()
 ```
 
-### Writing the system to gro and top files
+### Writing the system to gro and top files
 ```python
 # Write the gro file corresponding to the system
 system.write_gro('path/to/output.gro')

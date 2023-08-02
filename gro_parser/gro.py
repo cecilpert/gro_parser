@@ -38,7 +38,7 @@ class GroSystem:
                     resname = line_match.group(2).strip()
                     atomname = line_match.group(3).strip()
                     atomnumber = int(line_match.group(4).strip())
-                    coordinates = [line_match.group(i).strip() for i in range(5,8)]
+                    coordinates = [float(line_match.group(i).strip()) for i in range(5,8)]
                     velocities = [line_match.group(i).strip() for i in range(8,11)]
 
                     
@@ -148,8 +148,9 @@ class GroSystem:
                     atomnum = ' ' * (5 - _atomnum_char) + str(atom.number)
                     coords_str = ''
                     for coord in atom.coordinates:
-                        _coord_char = len(str(coord))
-                        coords_str += ' ' * (8 - _coord_char) + str(coord)
+                        str_coord = "{:.3f}".format(coord)
+                        _coord_char = len(str_coord)
+                        coords_str += ' ' * (8 - _coord_char) + str_coord
                     velocities_str = ''
                     for vel in atom.velocities:
                         _vel_char = len(str(vel))
@@ -194,7 +195,9 @@ class Residue:
         new_residue = Residue(new_number, self.name, new_idx, self.system)
         new_atom_number = last_atom.number + 1
         for atom in self.atoms:
-            new_residue.add_atom(atom.name, new_atom_number, atom.coordinates, atom.velocities)
+            new_coords = atom.coordinates[:]
+            new_coords[0] = round(new_coords[0] + 0.21, 3) #vdw radius
+            new_residue.add_atom(atom.name, new_atom_number, new_coords, atom.velocities)
             new_atom_number += 1
         
         self.system.insert_residue(new_residue)

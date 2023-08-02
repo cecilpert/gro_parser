@@ -156,7 +156,8 @@ class GroSystem:
                         velocities_str += ' ' * (8 - _vel_char) + str(vel)
                     o.write(f'{resnumber}{resname}{atomname}{atomnum}{coords_str}{velocities_str}\n')
             o.write(f' {" ".join([str(val) for val in self.box_vectors])}')
-
+        print(f'System gro file written in {gro_path}')
+    
     def write_top(self, top_path):
         with open(top_path, 'w') as o:
             for include in self._top_includes:
@@ -165,7 +166,8 @@ class GroSystem:
             o.write(f'[ system ]\n; name\n{self.name}\n\n')
             o.write(f'[ molecules ]\n; name number\n')
             for resname, residues in self._index_by_residue_name.items():
-                o.write(f'{resname} {len(residues)}\n')   
+                o.write(f'{resname} {len(residues)}\n')  
+        print(f'System top file written in {top_path}') 
 
 class Residue:
     def __init__(self, number: int, name: str, idx, system):

@@ -15,6 +15,12 @@ class GroSystem:
         self._parse(gro_file)
         print(f'Read top file : {top_file}') #Just to keep the includes lines
         self._parse_top(top_file)
+        self._max_x = None
+        self._max_y = None
+        self._max_z = None
+        self._min_x = None
+        self._min_y = None
+        self._min_z = None
 
     @property
     def residues(self):
@@ -23,6 +29,43 @@ class GroSystem:
     @property
     def atoms(self):
         return [a for res in self._residues for a in res.atoms]
+
+    @property
+    def max_x(self):
+        if self._max_x == None:
+            self._max_x = max([atom.coordinates[0] for atom in self.atoms])
+        return self._max_x
+    
+    @property
+    def min_x(self):
+        if self._min_x == None:
+            self._min_x = min([atom.coordinates[0] for atom in self.atoms])
+        return self._min_x
+    
+    @property
+    def max_y(self):
+        if self._max_y == None:
+            self._max_y = max([atom.coordinates[1] for atom in self.atoms])
+        return self._max_y
+    
+    @property
+    def min_y(self):
+        if self._min_y == None:
+            self._min_y = min([atom.coordinates[1] for atom in self.atoms])
+        return self._min_y
+    
+    @property
+    def max_z(self):
+        if self._max_z == None:
+            self._max_z = max([atom.coordinates[2] for atom in self.atoms])
+        return self._max_z
+    
+    @property
+    def min_z(self):
+        if self._min_z == None:
+            self._min_z = min([atom.coordinates[2] for atom in self.atoms])
+        return self._min_z
+    
 
     def _parse(self, gro_file):
         with open(gro_file) as f:
@@ -132,6 +175,21 @@ class GroSystem:
         except KeyError:
             raise ResidueNotFound(name)      
 
+    def select_residues(self, select_func, *kwargs):
+        to_return = []
+        for res in self.residues:
+            if select_func(res, *kwargs):     
+                to_return.append(res)
+        return to_return   
+
+    def select_residues_from_name(self, name, select_func, *kwargs):
+        residues_to_look_at = self.get_residue_by_name(name)
+        to_return = []
+        for res in residues_to_look_at:
+            if select_func(res, *kwargs):
+                to_return.append(res)
+        return to_return
+
     def write_gro(self, gro_path):
         with open(gro_path, 'w') as o:
             o.write(f'{self.name}\n')
@@ -183,6 +241,30 @@ class Residue:
     
     def add_atom(self, name, number, coordinates, velocities):
         self.atoms.append(Atom(name, number, coordinates, velocities, self))
+
+    @property
+    def min_x(self):
+        return min([atom.coordinates[0] for atom in self.atoms])
+    
+    @property
+    def max_x(self):
+        return max([atom.coordinates[0] for atom in self.atoms])
+    
+    @property
+    def min_y(self):
+        return min([atom.coordinates[1] for atom in self.atoms])
+    
+    @property
+    def max_y(self):
+        return max([atom.coordinates[1] for atom in self.atoms])
+    
+    @property
+    def min_z(self):
+        return min([atom.coordinates[2] for atom in self.atoms])
+    
+    @property
+    def max_z(self):
+        return max([atom.coordinates[2] for atom in self.atoms])
     
     def copy(self):
         print(f'I want to copy <{self}>')
@@ -227,6 +309,20 @@ class Atom:
 
     def __repr__(self):
         return f'{self.name} {self.number}'
+    
+    @property
+    def x(self):
+        return self.coordinates[0]
+    
+    @property
+    def y(self):
+        return self.coordinates[1]
+    
+    @property
+    def z(self):
+        return self.coordinates[2]
+    
+
 
 class GroParsingException(Exception):
     pass

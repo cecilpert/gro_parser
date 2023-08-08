@@ -258,11 +258,12 @@ class GroSystem:
 
         # Shift existing residues and their atom numbers to accommodate the new residue
         for res in self._residues[residue.idx:]:
-            res.number = res.number + 1
-            self._index_by_resnumber[res.number] = res
+            self._clear_from_index_resnum(res)
+            res.number = add_to_gro_number(res.number, 1)
+            self._add_to_index_resnum(res)
             res.idx = res.idx + 1
             for atom in res.atoms:
-                atom.number = atom.number + nb_atoms_to_shift
+                atom.number = add_to_gro_number(atom.number, nb_atoms_to_shift)
 
         # Insert the new residue into the molecular system list
         tmp_new_residues = self._residues[:residue.idx] + [residue] + self._residues[residue.idx:]
@@ -270,7 +271,7 @@ class GroSystem:
 
         # Update the internal dictionaries to include the new residue for efficient retrieval
         self._index_by_residue_name[residue.name].append(residue)
-        self._index_by_resnumber[residue.number] = residue
+        self._add_to_index_resnum(residue)
         
     def get_residue_by_idx(self, idx) : 
         """
@@ -305,6 +306,14 @@ class GroSystem:
     #         if select_func(res, *kwargs):     
     #             to_return.append(res)
     #     return to_return   
+
+    def _add_to_index_resnum(self, res):
+        if res.number not in self._index_by_resnumber:
+            self._index_by_resnumber[res.number] = []
+        self._index_by_resnumber[res.number].append(res)
+
+    def _clear_from_index_resnum(self, res):
+        self._index_by_resnumber[res.number].remove(res)
 
     def select_residues_from_name(self, name, select_func, *kwargs):
         """
@@ -577,12 +586,13 @@ class Residue:
         # Determine the 'number' and 'idx' for the new Residue based on the last residue with the same name.
         last = residues_stack[-1]
         last_atom = last.atoms[-1]
-        new_number = last.number + 1
+
+        new_number = add_to_gro_number(last.number, 1)
         new_idx = last.idx + 1
 
         # Create a new Residue object with updated 'number' and 'idx'.
         new_residue = Residue(new_number, self.name, new_idx, self.system)
-        new_atom_number = last_atom.number + 1
+        new_atom_number = add_to_gro_number(last_atom.number, 1)
 
         # Duplicate all Atom objects in the current residue and associate them with the new residue, shift their number 
         # The new Atom objects are not connected to the original Atom objects.
@@ -591,7 +601,7 @@ class Residue:
             new_coords[0] = round(new_coords[0] + 0.21, 3) # Adjust X-coordinate by adding 0.21 (vdW radius).
             # Create a new Atom object and add it to the new residue's 'atoms' list.
             new_residue.add_atom(atom.name, new_atom_number, new_coords, atom.velocities)
-            new_atom_number += 1
+            new_atom_number = add_to_gro_number(new_atom_number, 1)
         
         # Insert the new Residue into the molecular system using the 'insert_residue' method.
         self.system.insert_residue(new_residue)
@@ -619,6 +629,38 @@ class Atom:
     def z(self):
         return self.coordinates[2]
     
+def add_to_gro_number(number, to_add):
+    """
+    Function: add_to_gro_number
+
+    Add a value to a GROMACS-style atom or residue number while handling rollover.
+
+    Parameters:
+    - number (int): The current atom or residue number.
+    - to_add (int): The value to add to the current number.
+
+    Returns:
+    - int: The new atom or residue number after addition, considering rollover.
+
+    This function is used to add a specified value to a GROMACS-style atom or residue number, while taking
+    into account the rollover behavior. In GROMACS, atom and residue numbers are typically limited to five digits
+    (ranging from 0 to 99999). When adding a value to the current number, if the result exceeds 99999, the
+    number rolls over to 0 and continues counting. This function ensures that the rollover behavior is properly
+    handled and the new number stays within the valid range.
+
+    Example Usage:
+    current_number = 99998
+    added_value = 5
+    new_number = add_to_gro_number(current_number, added_value)
+    # In this case, new_number would be 3, as it rolls over from 99998 to 99999 and then to 1.
+
+    Notes:
+    This function assumes that the maximum atom or residue number in GROMACS is 99999.
+    """
+    new_number = number + to_add
+    if new_number >= 99999 :
+        new_number = number - 99999
+    return new_number
 
 class GroParsingException(Exception):
     pass

@@ -226,9 +226,10 @@ class GroSystem:
         self._index_by_residue_name[resname].append(residue)
 
         # Ensure that the residue number is unique and not already present in the system
-        if resnum in self._index_by_resnumber:
-            raise GroParsingException('Two residues with the same number')
-        self._index_by_resnumber[resnum] = residue
+        if resnum not in self._index_by_resnumber:
+            self._index_by_resnumber[resnum] = []
+            
+        self._index_by_resnumber[resnum].append(residue)
         
         return residue   
 

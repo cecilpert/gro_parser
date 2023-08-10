@@ -24,6 +24,8 @@ class GroSystem:
         self._index_by_residue_name = {}
         self._index_by_resnumber = {}
         self._top_includes = []
+        self._residues_stack = []
+        self._index_residues_stack_by_name = {}
         print(f'Read gro file : {gro_file}')
         self._parse(gro_file)
         print(f'Read top file : {top_file}') #Just to keep the includes lines
@@ -102,7 +104,10 @@ class GroSystem:
         if self._min_z == None:
             self._min_z = min([atom.coordinates[2] for atom in self.atoms])
         return self._min_z
-    
+
+    @property
+    def itp_names(self):
+        return [include.lstrip('"#include ').rstrip('"') for include in self._top_includes] 
 
     def _parse(self, gro_file):
         """
@@ -130,7 +135,7 @@ class GroSystem:
             f.readline() #Skip second line
             prev_resnum = -1 # Initialize the previous residue number to track when we go to the next residue
             idx = 0 # Initialize an index to assign to each residue
-
+            prev_resname = ""
             #Loop through lines from line 3
             for l in f:
                 line_match = re.search(GRO_LINE_REGEX, l)
@@ -147,7 +152,11 @@ class GroSystem:
 
                     if resnum != prev_resnum:
                         # New residue: create a new Residue object and add it to the system
-                        residue = self.add_residue_at_the_end(resname, resnum, idx)
+                        if prev_resname != resname:
+                            new_stack = True
+                        else: 
+                            new_stack = False
+                        residue = self.add_residue_at_the_end(resname, resnum, idx, new_stack)
                         idx += 1
 
                     else:
@@ -156,6 +165,7 @@ class GroSystem:
                             raise GroParsingException(f'A residue changed its name : resid {idx} from {residue.name} to {resname}')
                     
                     prev_resnum = resnum # Update the previous residue number for the next iteration
+                    prev_resname = resname
                     #Add the atoms to the residue
                     residue.add_atom(atomname, atomnumber, coordinates, velocities)
                     
@@ -181,6 +191,8 @@ class GroSystem:
                     if not (self.box_vectors[3] == self.box_vectors[4] == self.box_vectors[5] == 0):
                         print('WARNING : your box is not gromacs compatible, v1(y), v1(z) and v2(z) needs to be zero')
 
+        self._create_residue_stack_index()
+
     def _parse_top(self, top_file):
         """
             Private Method: _parse_top
@@ -201,7 +213,7 @@ class GroSystem:
                 if l.startswith('#include'):
                     self._top_includes.append(l.rstrip())
 
-    def add_residue_at_the_end(self, resname, resnum, idx):
+    def add_residue_at_the_end(self, resname, resnum, idx, new_stack):
         """
             Method: add_residue_at_the_end
 
@@ -219,6 +231,10 @@ class GroSystem:
         #Create and add the residue
         residue = Residue(resnum, resname, idx, self)
         self._residues.append(residue)
+        if new_stack:
+            self._residues_stack.append([residue])
+        else:
+            self._residues_stack[-1].append(residue)
 
          # Update the internal dictionaries for efficient residue retrieval
         if resname not in self._index_by_residue_name:
@@ -269,9 +285,14 @@ class GroSystem:
         tmp_new_residues = self._residues[:residue.idx] + [residue] + self._residues[residue.idx:]
         self._residues = tmp_new_residues
 
+        # Add to last residue stack
+        self._index_residues_stack_by_name[residue.name][-1].append(residue)
+
         # Update the internal dictionaries to include the new residue for efficient retrieval
         self._index_by_residue_name[residue.name].append(residue)
         self._add_to_index_resnum(residue)
+
+        
         
     def get_residue_by_idx(self, idx) : 
         """
@@ -314,6 +335,14 @@ class GroSystem:
 
     def _clear_from_index_resnum(self, res):
         self._index_by_resnumber[res.number].remove(res)
+
+    def _create_residue_stack_index(self):
+        for residue_stack in self._residues_stack:
+            name = residue_stack[0].name
+            if name not in self._index_residues_stack_by_name:
+                self._index_residues_stack_by_name[name] = []
+            self._index_residues_stack_by_name[name].append(residue_stack)
+            
 
     def select_residues_from_name(self, name, select_func, *kwargs):
         """
@@ -402,7 +431,7 @@ class GroSystem:
                         velocities_str += ' ' * (8 - _vel_char) + str(vel)
                     # Write the formatted atom data to the .gro file
                     o.write(f'{resnumber}{resname}{atomname}{atomnum}{coords_str}{velocities_str}\n')
-            o.write(f' {" ".join([str(val) for val in self.box_vectors])}') # Write box vectors at the end
+            o.write(f' {" ".join([str(val) for val in self.box_vectors])}\n') # Write box vectors at the end
         print(f'System gro file written in {gro_path}')
     
     def write_top(self, top_path):
@@ -432,8 +461,8 @@ class GroSystem:
             o.write('\n')
             o.write(f'[ system ]\n; name\n{self.name}\n\n')
             o.write(f'[ molecules ]\n; name number\n')
-            for resname, residues in self._index_by_residue_name.items():
-                o.write(f'{resname} {len(residues)}\n')  
+            for residue_stack in self._residues_stack:
+                o.write(f'{residue_stack[0].name} {len(residue_stack)}\n')  
         print(f'System top file written in {top_path}') 
 
 class Residue:

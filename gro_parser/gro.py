@@ -1,6 +1,6 @@
 import re
 
-GRO_LINE_REGEX = '^([\d ]{5})([\w ]{5})([\w ]{5})([\d ]{5})([\d. -]{8})([\d. -]{8})([\d. -]{8})([\d. -]{8})([\d. -]{8})([\d. -]{8})'
+GRO_LINE_REGEX = '^([\d ]{5})([\w ]{5})([\w ]{5})([\d ]{5})([\d. -]{8})([\d. -]{8})([\d. -]{8})(([\d. -]{8})([\d. -]{8})([\d. -]{8}))?'
 
 class GroSystem:
     def __init__(self, gro_file: str, top_file:str):
@@ -146,7 +146,10 @@ class GroSystem:
                     atomname = line_match.group(3).strip()
                     atomnumber = int(line_match.group(4).strip())
                     coordinates = [float(line_match.group(i).strip()) for i in range(5,8)]
-                    velocities = [line_match.group(i).strip() for i in range(8,11)]
+                    velocity_group = line_match.group(8)
+                    velocities = []
+                    if velocity_group:
+                        velocities = [line_match.group(i).strip() for i in range(9,12)]
 
                     
 
@@ -426,9 +429,10 @@ class GroSystem:
                         _coord_char = len(str_coord)
                         coords_str += ' ' * (8 - _coord_char) + str_coord
                     velocities_str = ''
-                    for vel in atom.velocities:
-                        _vel_char = len(str(vel))
-                        velocities_str += ' ' * (8 - _vel_char) + str(vel)
+                    if atom.velocities:
+                        for vel in atom.velocities:
+                            _vel_char = len(str(vel))
+                            velocities_str += ' ' * (8 - _vel_char) + str(vel)
                     # Write the formatted atom data to the .gro file
                     o.write(f'{resnumber}{resname}{atomname}{atomnum}{coords_str}{velocities_str}\n')
             o.write(f' {" ".join([str(val) for val in self.box_vectors])}\n') # Write box vectors at the end

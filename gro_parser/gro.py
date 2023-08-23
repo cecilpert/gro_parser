@@ -29,6 +29,7 @@ class GroSystem:
         print(f'Read gro file : {gro_file}')
         self._parse(gro_file)
         print(f'Read top file : {top_file}') #Just to keep the includes lines
+        self.is_martini = False
         self._parse_top(top_file)
         self._max_x = None
         self._max_y = None
@@ -36,6 +37,7 @@ class GroSystem:
         self._min_x = None
         self._min_y = None
         self._min_z = None
+        
 
     @property
     def residues(self):
@@ -215,6 +217,10 @@ class GroSystem:
             for l in f:
                 if l.startswith('#include'):
                     self._top_includes.append(l.rstrip())
+                    if 'martini' in l:
+                        self.is_martini = True
+        if self.is_martini:
+            print('Your force field seems to be martini')
 
     def add_residue_at_the_end(self, resname, resnum, idx, new_stack):
         """
@@ -466,7 +472,22 @@ class GroSystem:
             o.write(f'[ system ]\n; name\n{self.name}\n\n')
             o.write(f'[ molecules ]\n; name number\n')
             for residue_stack in self._residues_stack:
-                o.write(f'{residue_stack[0].name} {len(residue_stack)}\n')  
+                if residue_stack[0].name == 'ION' and self.is_martini:
+                    print('Your system is martini with ion, ION will be replaced by atom name on the top file')
+                    atom_names = set([atom.name for res in residue_stack for atom in res.atoms])
+                    if len(atom_names) == 1:
+                        o.write(f'{atom_names.pop()} {len(residue_stack)}\n')  
+                    else:
+                        ion_count = {}
+                        for res in residue_stack:
+                            for atom in res.atoms:
+                                if atom.name not in ion_count:
+                                    ion_count[atom.name] = 0
+                                ion_count[atom.name] += 1
+                        for ion, nb in ion_count.items():
+                            o.write(f'{ion} {nb} \n')
+                else:
+                    o.write(f'{residue_stack[0].name} {len(residue_stack)}\n')  
         print(f'System top file written in {top_path}') 
 
 class Residue:

@@ -1,4 +1,8 @@
 import re
+from .base_logger import logger
+import logging
+
+logger.setLevel(logging.INFO)
 
 GRO_LINE_REGEX = '^([\d ]{5})([\w ]{5})([\w ]{5})([\d ]{5})([\d. -]{8})([\d. -]{8})([\d. -]{8})(([\d. -]{8})([\d. -]{8})([\d. -]{8}))?'
 
@@ -26,9 +30,10 @@ class GroSystem:
         self._top_includes = []
         self._residues_stack = []
         self._index_residues_stack_by_name = {}
-        print(f'Read gro file : {gro_file}')
+        logger.info(f'Load gromacs system with gro_parser')
+        logger.debug(f'Read gro file : {gro_file}')
         self._parse(gro_file)
-        print(f'Read top file : {top_file}') #Just to keep the includes lines
+        logger.debug(f'Read top file : {top_file}') #Just to keep the includes lines
         self.is_martini = False
         self._parse_top(top_file)
         self._max_x = None
@@ -194,7 +199,7 @@ class GroSystem:
 
                     # Last checking, verify if the box is GROMACS compatible (v1(y)=v1(z)=v2(z)=0). If not, print a warning message.
                     if not (self.box_vectors[3] == self.box_vectors[4] == self.box_vectors[5] == 0):
-                        print('WARNING : your box is not gromacs compatible, v1(y), v1(z) and v2(z) needs to be zero')
+                        logger.warn('WARNING : your box is not gromacs compatible, v1(y), v1(z) and v2(z) needs to be zero')
 
         self._create_residue_stack_index()
 
@@ -220,7 +225,7 @@ class GroSystem:
                     if 'martini' in l:
                         self.is_martini = True
         if self.is_martini:
-            print('Your force field seems to be martini')
+            logger.debug('Your force field seems to be martini')
 
     def add_residue_at_the_end(self, resname, resnum, idx, new_stack):
         """
@@ -276,7 +281,7 @@ class GroSystem:
         reflect its correct position within the system. This method is useful when inserting a new residue
         obtained from another system or when modifying the system's topology with new components.
         """
-        print(f'Insert <{residue}> in {residue.idx}th position')
+        logger.debug(f'Insert <{residue}> in {residue.idx}th position')
 
         # Calculate the number of atoms in the new residue to shift atom numbers
         nb_atoms_to_shift = len(residue.atoms)
@@ -442,7 +447,7 @@ class GroSystem:
                     # Write the formatted atom data to the .gro file
                     o.write(f'{resnumber}{resname}{atomname}{atomnum}{coords_str}{velocities_str}\n')
             o.write(f' {" ".join([str(val) for val in self.box_vectors])}\n') # Write box vectors at the end
-        print(f'System gro file written in {gro_path}')
+        logger.debug(f'System gro file written in {gro_path}')
     
     def write_top(self, top_path):
         """
@@ -473,7 +478,7 @@ class GroSystem:
             o.write(f'[ molecules ]\n; name number\n')
             for residue_stack in self._residues_stack:
                 if residue_stack[0].name == 'ION' and self.is_martini:
-                    print('Your system is martini with ion, ION will be replaced by atom name on the top file')
+                    logger.debug('Your system is martini with ion, ION will be replaced by atom name on the top file')
                     atom_names = set([atom.name for res in residue_stack for atom in res.atoms])
                     if len(atom_names) == 1:
                         o.write(f'{atom_names.pop()} {len(residue_stack)}\n')  
@@ -488,7 +493,7 @@ class GroSystem:
                             o.write(f'{ion} {nb} \n')
                 else:
                     o.write(f'{residue_stack[0].name} {len(residue_stack)}\n')  
-        print(f'System top file written in {top_path}') 
+        logger.debug(f'System top file written in {top_path}') 
 
 class Residue:
     def __init__(self, number: int, name: str, idx, system):
@@ -634,9 +639,9 @@ class Residue:
         in a molecular system. You can create a copy of the residue like this:
         residue.copy()
         """
-        print(f'I want to copy <{self}>')
+        logger.debug(f'I want to copy <{self}>')
         residues_stack = self.system.get_residue_by_name(self.name)
-        print(f'Will be copied at the end of {len(residues_stack)} {self.name} stack')
+        logger.debug(f'Will be copied at the end of {len(residues_stack)} {self.name} stack')
         # Determine the 'number' and 'idx' for the new Residue based on the last residue with the same name.
         last = residues_stack[-1]
         last_atom = last.atoms[-1]

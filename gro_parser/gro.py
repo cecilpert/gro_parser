@@ -45,6 +45,13 @@ class GroSystem:
         Provides an iterator over the Residue objects in the molecular system.
         """
         return iter(self._residues)
+    
+    @property
+    def residue_names(self):
+        """
+        Retrieve a set of unique residue names present in the molecular system.'''
+        """
+        return set([res.name for res in self.residues])
 
     @property
     def atoms(self):
@@ -330,13 +337,6 @@ class GroSystem:
         except KeyError:
             raise ResidueNotFound(name)      
 
-    # def select_residues(self, select_func, *kwargs):
-    #     to_return = []
-    #     for res in self.residues:
-    #         if select_func(res, *kwargs):     
-    #             to_return.append(res)
-    #     return to_return   
-
     def _add_to_index_resnum(self, res):
         if res.number not in self._index_by_resnumber:
             self._index_by_resnumber[res.number] = []
@@ -489,6 +489,29 @@ class GroSystem:
                 else:
                     o.write(f'{residue_stack[0].name} {len(residue_stack)}\n')  
         print(f'System top file written in {top_path}') 
+
+    def make_change_on_residues(self, change_func, *kwargs):
+        """
+        Method: make_change_on_residues
+
+        Apply a custom change function to all residues in the molecular system.
+
+        Args:
+        - change_func (callable): A function that defines the desired change to apply to each residue.
+        - *kwargs: Variable-length argument list to pass additional arguments to the change function.
+
+        This method allows you to apply a custom change to all residues in the molecular system. You specify
+        the 'change_func' argument, which should be a callable that defines the desired modification to apply
+        to each residue. Any additional arguments required by the 'change_func' can be passed as *kwargs.
+
+        Note:
+        - The 'change_func' should be a callable that accepts at least one argument, which is a 'residue' object.
+        - Additional arguments required by the 'change_func' should be passed as *kwargs.
+        - This function applies the same change function to all residues in the molecular system.
+        - Any changes made to the residues are directly reflected in the system.
+        """
+        for res in self.residues:
+            change_func(res, *kwargs)
 
 class Residue:
     def __init__(self, number: int, name: str, idx, system):
@@ -659,6 +682,51 @@ class Residue:
         
         # Insert the new Residue into the molecular system using the 'insert_residue' method.
         self.system.insert_residue(new_residue)
+
+    def change_coordinates(self, new_coords):
+        """
+        Method: change_coordinates
+
+        Update the coordinates of all atoms in the residue to new coordinates.
+
+        Parameters:
+        - new_coords (list): A list of new X, Y, Z coordinates to set for all atoms in the residue.
+
+        Returns:
+        - None
+
+        Example Usage:
+        residue = Residue(number=1, name="ALA", idx=0, system=my_system)
+        new_coordinates = [1.0, 2.0, 3.0]
+        residue.change_coordinates(new_coordinates)
+        # All atoms in the residue will have their coordinates set to [1.0, 2.0, 3.0].
+        """
+        for atom in self.atoms:
+            atom.coordinates = new_coords
+    
+    def change_velocity(self, new_velocity):
+        """
+        Method: change_velocity
+
+        Update the velocities of all atoms in the residue to new velocities.
+
+        Parameters:
+        - new_velocity (list): A list of new velocity components (e.g., VX, VY, VZ) to set for all atoms in the residue.
+
+        Returns:
+        - None
+
+        This method iterates through all atoms in the residue and updates their velocities to the new velocities
+        provided. It allows for changing the motion state of the entire residue in the molecular system.
+
+        Example Usage:
+        residue = Residue(number=1, name="ALA", idx=0, system=my_system)
+        new_velocity = [0.1, 0.2, 0.3]
+        residue.change_velocity(new_velocity)
+        # All atoms in the residue will have their velocities set to [0.1, 0.2, 0.3].
+        """
+        for atom in self.atoms:
+            atom.velocities = new_velocity
         
 class Atom:
     def __init__(self, name: str, number: int, coordinates, velocities, residue):

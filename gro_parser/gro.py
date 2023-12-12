@@ -313,7 +313,12 @@ class GroSystem:
         self._index_by_residue_name[residue.name].append(residue)
         self._add_to_index_resnum(residue)
 
-        
+    def delete_residue(self, residue):
+        self._residues.remove(residue)
+        self._index_by_residue_name[residue.name].remove(residue)
+        for residue_stack in self._index_residues_stack_by_name[residue.name]:
+            if residue in residue_stack:
+                residue_stack.remove(residue)
         
     def get_residue_by_idx(self, idx) : 
         """
@@ -732,7 +737,12 @@ class Residue:
         """
         for atom in self.atoms:
             atom.velocities = new_velocity
-        
+
+    def delete(self):
+        logger.debug(f'I want to delete <{self}>')
+        self.system.delete_residue(self)
+
+
 class Atom:
     def __init__(self, name: str, number: int, coordinates, velocities, residue):
         self.name = name

@@ -1,13 +1,14 @@
 import re
 from .base_logger import logger
 import logging
+import copy
 
 logger.setLevel(logging.INFO)
 
 GRO_LINE_REGEX = '^([\d ]{5})([\w ]{5})([\w ]{5})([\d ]{5})([\d. -]{8})([\d. -]{8})([\d. -]{8})(([\d. -]{8})([\d. -]{8})([\d. -]{8}))?'
 
 class GroSystem:
-    def __init__(self, gro_file: str, top_file:str):
+    def __init__(self, gro_file: str, top_file:str = None, itp_file: str = None):
         """
         Initialize a molecular system based on GROMACS .gro and .top files.
 
@@ -27,15 +28,20 @@ class GroSystem:
         self._residues = []
         self._index_by_residue_name = {}
         self._index_by_resnumber = {}
+        self._index_by_atomnumber = {}
         self._top_includes = []
         self._residues_stack = []
         self._index_residues_stack_by_name = {}
+        self.itp_info = {}
         logger.info(f'Load gromacs system with gro_parser')
         logger.debug(f'Read gro file : {gro_file}')
         self._parse(gro_file)
         logger.debug(f'Read top file : {top_file}') #Just to keep the includes lines
         self.is_martini = False
-        self._parse_top(top_file)
+        if top_file:
+            self._parse_top(top_file)
+        if itp_file:
+            self._parse_itp(itp_file)
         self._max_x = None
         self._max_y = None
         self._max_z = None
@@ -165,8 +171,6 @@ class GroSystem:
                     if velocity_group:
                         velocities = [line_match.group(i).strip() for i in range(9,12)]
 
-                    
-
                     if resnum != prev_resnum:
                         # New residue: create a new Residue object and add it to the system
                         if prev_resname != resname:
@@ -184,8 +188,8 @@ class GroSystem:
                     prev_resnum = resnum # Update the previous residue number for the next iteration
                     prev_resname = resname
                     #Add the atoms to the residue
-                    residue.add_atom(atomname, atomnumber, coordinates, velocities)
-                    
+                    atom = residue.add_atom(atomname, atomnumber, coordinates, velocities)
+                    self._register_atom_in_index(atom)
 
                 else:
                      # If gro is correctly formated, it's the last line, check that
@@ -233,6 +237,173 @@ class GroSystem:
                         self.is_martini = True
         if self.is_martini:
             logger.debug('Your force field seems to be martini')
+
+    def _parse_itp(self, itp_file):
+        with open(itp_file) as f:
+            current_category = 'header'
+            for l in f:
+                l = l.strip().rstrip('\n')
+                if l != '':
+                    if l.startswith('['):
+                        current_category = l.replace('[', '').replace(']', '').strip()
+                    else:
+                    
+                        if current_category not in self.itp_info:
+                            self.itp_info[current_category] = []
+                        self.itp_info[current_category].append(l.rstrip('\n'))
+        self._try_to_populate_atom_with_itp()
+        
+        self._register_itp_relation('bonds', ['i', 'j'])
+        self._register_itp_relation('angles', ['i', 'j', 'k'])
+        self._register_itp_relation('dihedrals', ['i', 'j', 'k', 'l'])
+
+
+    def _try_to_populate_atom_with_itp(self):
+        if not self.itp_info['atoms']:
+            logger.warn('No atoms category in itp file, impossible to load itp atoms information into system')
+            return
+        atoms_info = self.itp_info['atoms']
+        if not atoms_info[0].startswith(';'):
+            logger.warn('No header line to identify columns in itp atoms part, impossible to load itp atoms information into system')
+            return
+        header_cats = atoms_info[0].lstrip(';').split()
+        try:
+            itp_atom_name_idx = header_cats.index('atom')
+        except ValueError:
+            logger.warn('No atom column in itp atoms part, impossible to load itp atoms information into system')
+            return
+
+        if not 'atom' in header_cats:
+            logger.warn('No atom column in itp atoms part, impossible to load itp atoms information into system')
+            return
+        atoms_line = atoms_info[1:]
+        if len(atoms_line) != len(self.atoms):
+            logger.warn('Not the same number of atoms in system and itp file, impossible to load itp atoms information into system')
+            return
+        for idx, atom in enumerate(self.atoms):
+            itp_atom_name = atoms_line[idx].split()[itp_atom_name_idx]
+            if not itp_atom_name == atom.name:
+                logger.warn(f'Correspondance error with the {idx}th atom between itp and gro. Names are different : {itp_atom_name} in itp, {atom.name} in gro. Impossible to load itp atoms information into system')
+                return
+        
+        for idx, atom in enumerate(self.atoms):
+            atom.itp_info = {}
+            for idx_header, header in enumerate(header_cats):
+                atom.itp_info[header] = atoms_line[idx].split()[idx_header]
+
+        logger.info("itp file has been used to register more informations on system's atoms")
+            
+
+            
+    def _register_bonds_from_itp(self):
+        if not 'bonds' in self.itp_info:
+            logger.warn('No bonds part in itp. Impossible to register bonds into system.')
+            return
+        if not self.itp_info['bonds'][0].startswith(';'):
+            logger.warn('No header line to identify columns in itp bonds part. Impossible to register bonds into system.')
+            return
+        header = self.itp_info['bonds'][0].lstrip(';').split()
+        bonds = self.itp_info['bonds'][1:]
+        if not 'i' in header:
+            logger.warn('No i column in bonds part. Impossible to register bonds into system.')
+            return
+        if not 'j' in header:
+            logger.warn('No j column in bonds part. Impossible to register bonds into system.')
+            return
+        if not 'length' in header:
+            logger.warn('No length column in bonds part. Impossible to register bonds into system.')
+            return
+        
+        i_idx = header.index('i')
+        j_idx = header.index('j')
+        length_idx = header.index('length')
+        
+        for bond_line in bonds:
+            bond = bond_line.split()
+            try: 
+                i_atom = self.get_atom_by_number(int(bond[i_idx]))
+            except AtomNotFound: 
+                logger.warn(f'Atom with i = {bond[i_idx]} not found in system. Impossible to register bonds into system.')
+                return
+            try: 
+                j_atom = self.get_atom_by_number(int(bond[j_idx]))
+            except AtomNotFound:
+                logger.warn(f'Atom with j = {bond[j_idx]} not found in system. Impossible to register bonds into system.')
+                return
+            
+            bond_obj = Bond(i_atom, j_atom, float(bond[length_idx]))
+            for col_idx, col in enumerate(header):
+                bond_obj.itp_info[col] = bond[col_idx]
+            i_atom.register_bond(bond_obj)
+            j_atom.register_bond(bond_obj)
+
+        logger.info('itp file has been used to register bonds into system')
+    
+    def _register_itp_relation(self, part_to_check, col_to_check):
+        if part_to_check not in ['angles', 'bonds', 'dihedrals']:
+            logger.warn(f'{part_to_check} is not supported yet to be registered into system')
+        
+        if not part_to_check in self.itp_info:
+            logger.warn(f'No {part_to_check} part in itp. Impossible to register {part_to_check} into system.')
+            return
+        if not self.itp_info[part_to_check][0].startswith(';'):
+            logger.warn(f'No header line to identify columns in itp {part_to_check} part. Impossible to register {part_to_check} into system.')
+            return
+        
+        header = self.itp_info[part_to_check][0].lstrip(';').split()
+        lines = self.itp_info[part_to_check][1:]
+
+        if part_to_check == "bonds":
+            if not 'length' in header:
+                logger.warn('No length column in bonds part. Impossible to register bonds into system.')
+                return
+            length_idx = header.index('length')
+
+        for col in col_to_check:
+            if not col in header:
+                logger.warn(f'No {col} column in bonds part. Impossible to register {part_to_check} into system.')
+                return
+            
+        col_idx = [header.index(col) for col in col_to_check]
+        
+        for line in lines:
+            line = line.split()
+            atoms = []
+            for atom_idx in col_idx:
+                try:
+                    atom = self.get_atom_by_number(int(line[atom_idx]))
+                    atoms.append(atom)
+                except AtomNotFound:
+                    logger.warn(f'Atom {line[atom_idx]} not found in system. Impossible to register this {part_to_check} into system.')
+                    
+                    return
+            
+            if part_to_check == 'bonds':
+                link_obj = Bond(*atoms, float(line[length_idx]))
+                for atom in atoms:
+                    atom.register_bond(link_obj)
+            
+            if part_to_check == "angles":
+                link_obj = Angle(*atoms)
+                for atom in atoms:
+                    atom.register_angle(link_obj)
+
+            if part_to_check == "dihedrals":
+                link_obj = Dihedral(*atoms)
+                for atom in atoms:
+                    atom.register_dihedral(link_obj)
+
+            for idx, col in enumerate(header):
+                link_obj.itp_info[col] = line[idx]
+        
+        logger.info(f'itp file has been used to register {part_to_check} into system')
+           
+
+
+
+        
+
+        
 
     def add_residue_at_the_end(self, resname, resnum, idx, new_stack):
         """
@@ -295,10 +466,12 @@ class GroSystem:
 
         # Shift existing residues and their atom numbers to accommodate the new residue
         for res in self._residues[residue.idx:]:
+            print('res to shift', res)
             self._clear_from_index_resnum(res)
             res.number = add_to_gro_number(res.number, 1)
             self._add_to_index_resnum(res)
             res.idx = res.idx + 1
+
             for atom in res.atoms:
                 atom.number = add_to_gro_number(atom.number, nb_atoms_to_shift)
 
@@ -307,11 +480,19 @@ class GroSystem:
         self._residues = tmp_new_residues
 
         # Add to last residue stack
+        if not residue.name in self._index_residues_stack_by_name:
+            self._index_residues_stack_by_name[residue.name] = [[]] 
         self._index_residues_stack_by_name[residue.name][-1].append(residue)
 
         # Update the internal dictionaries to include the new residue for efficient retrieval
+        if not residue.name in self._index_by_residue_name:
+            self._index_by_residue_name[residue.name] = []
         self._index_by_residue_name[residue.name].append(residue)
         self._add_to_index_resnum(residue)
+        
+        self._index_by_atomnumber = {}
+        for a in self.atoms:
+            self._register_atom_in_index(a)
 
     def delete_residue(self, residue):
         self._residues.remove(residue)
@@ -346,6 +527,12 @@ class GroSystem:
             return self._index_by_residue_name[name]
         except KeyError:
             raise ResidueNotFound(name)      
+
+    def get_atom_by_number(self, number):
+        try:
+            return self._index_by_atomnumber[number]
+        except KeyError: 
+            raise AtomNotFound(number)
 
     def _add_to_index_resnum(self, res):
         if res.number not in self._index_by_resnumber:
@@ -452,7 +639,7 @@ class GroSystem:
                     # Write the formatted atom data to the .gro file
                     o.write(f'{resnumber}{resname}{atomname}{atomnum}{coords_str}{velocities_str}\n')
             o.write(f' {" ".join([str(val) for val in self.box_vectors])}\n') # Write box vectors at the end
-        logger.debug(f'System gro file written in {gro_path}')
+        logger.info(f'System gro file written in {gro_path}')
     
     def write_top(self, top_path):
         """
@@ -500,6 +687,52 @@ class GroSystem:
                     o.write(f'{residue_stack[0].name} {len(residue_stack)}\n')  
         logger.debug(f'System top file written in {top_path}') 
 
+    def write_itp(self, itp_path):
+        should_be_handled_part = ['atoms', 'bonds', 'angles', 'dihedrals']
+
+        with open(itp_path, 'w') as itp:
+            for part in self.itp_info:
+                if part == 'header':
+                    itp.write('\n'.join(self.itp_info['header']) + '\n')
+                    itp.write('; system loaded with gro_parser\n;\n')
+                elif part in should_be_handled_part:
+                    itp.write(f'[ {part} ]\n')
+                    header = self.itp_info[part][0].lstrip(';').split()
+                    itp.write(self.itp_info[part][0] + '\n')
+                    
+                    if part == 'atoms':
+                        for atom in self.atoms:
+                            itp.write("\t".join(atom.itp_info[col] for col in header) + '\n')
+                    
+                    if part == 'bonds':
+                       written_bonds = []
+                       for atom in self.atoms:
+                           for bond in atom.bonds:
+                                if bond not in written_bonds: 
+                                    itp.write("\t".join(bond.itp_info[col] for col in header) + '\n')
+                                    written_bonds.append(bond)
+                    if part == 'angles':
+                        written_angles = []
+                        for atom in self.atoms:
+                           for angle in atom.angles:
+                                if angle not in written_angles: 
+                                    itp.write("\t".join(angle.itp_info[col] for col in header) + '\n')
+                                    written_angles.append(angle)
+
+                    if part == "dihedrals":
+                        written_dihedrals = []
+                        for atom in self.atoms:
+                           for d in atom.dihedrals:
+                                if d not in written_dihedrals: 
+                                    itp.write("\t".join(d.itp_info[col] for col in header) + '\n')
+                                    written_dihedrals.append(d)
+                            
+                else:
+                    itp.write(f'[ {part} ]\n')
+                    itp.write('\n'.join(self.itp_info[part]) + '\n')
+
+        logger.info(f'System itp file written in {itp_path}')
+
     def make_change_on_residues(self, change_func, *kwargs):
         """
         Method: make_change_on_residues
@@ -522,6 +755,20 @@ class GroSystem:
         """
         for res in self.residues:
             change_func(res, *kwargs)
+
+    def select_atoms(self, select_func, *kwargs):
+        to_return = []
+        for atom in self.atoms:
+            if select_func(atom, *kwargs):
+                to_return.append(atom)
+        return to_return
+    
+    def _register_atom_in_index(self, atom):
+
+        self._index_by_atomnumber[atom.number] = atom
+    
+    def _clear_from_index_atomnum(self, atom):
+        del self._index_by_atomnumber[atom.number]
 
 class Residue:
     def __init__(self, number: int, name: str, idx, system):
@@ -585,7 +832,9 @@ class Residue:
         residue = Residue(number=1, name="ALA", idx=0, system=my_system)
         residue.add_atom(name="CA", number=1, coordinates=[0.0, 1.0, 2.0], velocities=[0.1, 0.2, 0.3])
         """
-        self.atoms.append(Atom(name, number, coordinates, velocities, self))
+        atom = Atom(name, number, coordinates, velocities, self)
+        self.atoms.append(atom)
+        return atom
 
     @property
     def min_x(self):
@@ -750,6 +999,9 @@ class Atom:
         self.coordinates = coordinates
         self.velocities = velocities
         self.residue = residue
+        self.bonds = []
+        self.angles = []
+        self.dihedrals = []
 
     def __repr__(self):
         return f'{self.name} {self.number}'
@@ -766,6 +1018,81 @@ class Atom:
     def z(self):
         return self.coordinates[2]
     
+    def set_z(self, z):
+        self.coordinates[2] = z
+
+    def register_bond(self, bond):
+        self.bonds.append(bond)
+    
+    def register_angle(self, angle):
+        self.angles.append(angle)
+    
+    def register_dihedral(self, dihedral):
+        self.dihedrals.append(dihedral)
+    
+    def delete_all_angles(self):
+        copied_angles = self.angles[:]
+        for angle in copied_angles:
+            angle.delete()
+
+    def delete_one_angle(self, angle):
+        self.angles.remove(angle)
+
+    def delete_all_dihedrals(self):
+        copied_dihedrals = self.dihedrals[:]
+        for d in copied_dihedrals:
+            d.delete()
+
+    def delete_one_dihedral(self, d):
+        self.dihedrals.remove(d) 
+
+class Bond:
+    def __init__(self, atom1:Atom, atom2: Atom, length: float):
+        self.atom1 = atom1
+        self.atom2 = atom2
+        self.length = length
+        self.itp_info = {}
+
+    def __repr__(self):
+        return f'Bond btw {self.atom1.name} {self.atom2.name}, length {self.length}'
+    
+    def set_length(self, length):
+        self.length = length
+        self.itp_info['length'] = str(length)
+
+
+class Angle:
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom):
+        self.atom1 = atom1 
+        self.atom2 = atom2
+        self.atom3 = atom3
+        self.itp_info = {}
+
+    def __repr__(self):
+        return f'Angle btw {self.atom1.name} {self.atom2.name} {self.atom3.name}'
+    
+    def delete(self):
+        self.atom1.delete_one_angle(self)
+        self.atom2.delete_one_angle(self)
+        self.atom3.delete_one_angle(self)
+    
+class Dihedral:
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom):
+        self.atom1 = atom1 
+        self.atom2 = atom2
+        self.atom3 = atom3
+        self.atom4 = atom4
+        self.itp_info = {}
+    
+    def __repr__(self):
+        return f'Dihedral btw {self.atom1.name} {self.atom2.name} {self.atom3.name} {self.atom4.name}'
+    
+    def delete(self):
+        self.atom1.delete_one_dihedral(self)
+        self.atom2.delete_one_dihedral(self)
+        self.atom3.delete_one_dihedral(self)
+        self.atom4.delete_one_dihedral(self)
+
 def add_to_gro_number(number, to_add):
     """
     Function: add_to_gro_number
@@ -805,4 +1132,10 @@ class GroParsingException(Exception):
 class ResidueNotFound(Exception):
     def __init__(self, residue):
         message = f'Residue {residue} not found'
+        super().__init__(message)
+
+
+class AtomNotFound(Exception):
+    def __init__(self, number):
+        message = f'Atom {number} not found'
         super().__init__(message)

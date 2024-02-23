@@ -1,9 +1,9 @@
-from . import gro
+from . import system
 from .base_logger import logger
 import logging
 
 def load_system(gro_file:str, top_file:str = None, itp_file: str = None):
-    system = gro.GroSystem(gro_file, top_file, itp_file)
+    system = system.GroSystem(gro_file, top_file, itp_file)
     return system
 
 def set_logger_info():

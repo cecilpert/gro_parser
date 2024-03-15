@@ -81,6 +81,9 @@ class Angle:
         self.atom1.delete_one_angle(self)
         self.atom2.delete_one_angle(self)
         self.atom3.delete_one_angle(self)
+
+    def set_angle_value(self, value):
+        self.itp_info['angle'] = str(value)
     
 class Dihedral:
     def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom):

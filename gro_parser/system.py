@@ -276,7 +276,13 @@ class GroSystem:
         col_idx = [header.index(col) for col in col_to_check]
         
         for line in lines:
-            line = line.split()
+            if line.startswith(';'):
+                register_comment = True
+            else: 
+                register_comment = False
+
+            line = line.lstrip(';').split()
+            
             atoms = []
             for atom_idx in col_idx:
                 try:
@@ -288,17 +294,17 @@ class GroSystem:
                     return
             
             if part_to_check == 'bonds':
-                link_obj = Bond(*atoms, float(line[length_idx]))
+                link_obj = Bond(*atoms, float(line[length_idx]), comment = register_comment)
                 for atom in atoms:
                     atom.register_bond(link_obj)
             
             if part_to_check == "angles":
-                link_obj = Angle(*atoms)
+                link_obj = Angle(*atoms, comment = register_comment)
                 for atom in atoms:
                     atom.register_angle(link_obj)
 
             if part_to_check == "dihedrals":
-                link_obj = Dihedral(*atoms)
+                link_obj = Dihedral(*atoms, comment = register_comment)
                 for atom in atoms:
                     atom.register_dihedral(link_obj)
 
@@ -507,14 +513,20 @@ class GroSystem:
                        for atom in self.atoms:
                            for bond in atom.bonds:
                                 if bond not in written_bonds: 
-                                    itp.write("\t".join(bond.itp_info[col] for col in header) + '\n')
+                                    line = "\t".join(bond.itp_info[col] for col in header) + '\n'
+                                    if bond.comment : 
+                                        line = ";" + line
+                                    itp.write(line)
                                     written_bonds.append(bond)
                     if part == 'angles':
                         written_angles = []
                         for atom in self.atoms:
                            for angle in atom.angles:
                                 if angle not in written_angles: 
-                                    itp.write("\t".join(angle.itp_info[col] for col in header) + '\n')
+                                    line = "\t".join(angle.itp_info[col] for col in header) + '\n'
+                                    if angle.comment:
+                                        line = ";" + line
+                                    itp.write(line)
                                     written_angles.append(angle)
 
                     if part == "dihedrals":
@@ -522,7 +534,10 @@ class GroSystem:
                         for atom in self.atoms:
                            for d in atom.dihedrals:
                                 if d not in written_dihedrals: 
-                                    itp.write("\t".join(d.itp_info[col] for col in header) + '\n')
+                                    line = "\t".join(d.itp_info[col] for col in header) + '\n'
+                                    if d.comment:
+                                        line = ";" + line
+                                    itp.write(line)
                                     written_dihedrals.append(d)
                             
                 else:

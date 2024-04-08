@@ -8,6 +8,7 @@ class Atom:
         self.bonds = []
         self.angles = []
         self.dihedrals = []
+        self.itp_info = {}
 
     def __repr__(self):
         return f'{self.name} {self.number}'
@@ -52,12 +53,22 @@ class Atom:
     def delete_one_dihedral(self, d):
         self.dihedrals.remove(d) 
 
+    def comment_all_dihedrals(self):
+        for d in self.dihedrals:
+            d.comment = True
+
+    def change_atomtype(self, atomtype):
+        if 'type' not in self.itp_info:
+            raise MissingItpDescription('atom type')
+        self.itp_info['type'] = atomtype
+
 class Bond:
-    def __init__(self, atom1:Atom, atom2: Atom, length: float):
+    def __init__(self, atom1:Atom, atom2: Atom, length: float, comment: bool = False):
         self.atom1 = atom1
         self.atom2 = atom2
         self.length = length
         self.itp_info = {}
+        self.comment = comment
 
     def __repr__(self):
         return f'Bond btw {self.atom1.name} {self.atom2.name}, length {self.length}'
@@ -68,11 +79,12 @@ class Bond:
 
 
 class Angle:
-    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom):
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, comment: bool = False):
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3
         self.itp_info = {}
+        self.comment = comment
 
     def __repr__(self):
         return f'Angle btw {self.atom1.name} {self.atom2.name} {self.atom3.name}'
@@ -86,12 +98,13 @@ class Angle:
         self.itp_info['angle'] = str(value)
     
 class Dihedral:
-    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom):
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom, comment : bool = False):
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3
         self.atom4 = atom4
         self.itp_info = {}
+        self.comment = comment
     
     def __repr__(self):
         return f'Dihedral btw {self.atom1.name} {self.atom2.name} {self.atom3.name} {self.atom4.name}'
@@ -101,3 +114,9 @@ class Dihedral:
         self.atom2.delete_one_dihedral(self)
         self.atom3.delete_one_dihedral(self)
         self.atom4.delete_one_dihedral(self)
+
+
+class MissingItpDescription(Exception):
+    def __init__(self, missing_thing):
+        message = f'{missing_thing} is not described in itp file'
+        super().__init__(message)

@@ -11,6 +11,9 @@ GRO_LINE_REGEX = '^([\d ]{5})([\w ]{5})([\w ]{5})([\d ]{5})([\d. -]{8})([\d. -]{
 
 class GroSystem:
     def __init__(self, gro_file: str, top_file:str = None, itp_file: str = None):
+        self.gro_file = gro_file
+        self.top_file = top_file
+        self.itp_file = itp_file
         self.name = ''
         self.box_vectors = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self._residues = []
@@ -212,6 +215,8 @@ class GroSystem:
         self._register_itp_relation('angles', ['i', 'j', 'k'])
         self._register_itp_relation('dihedrals', ['i', 'j', 'k', 'l'])
 
+        self._top_includes.append(f'#include "{itp_file}"')
+
 
     def _try_to_populate_atom_with_itp(self):
         if not self.itp_info['atoms']:
@@ -343,7 +348,6 @@ class GroSystem:
 
         # Shift existing residues and their atom numbers to accommodate the new residue
         for res in self._residues[residue.idx:]:
-            print('res to shift', res)
             self._clear_from_index_resnum(res)
             res.number = add_to_gro_number(res.number, 1)
             self._add_to_index_resnum(res)
@@ -424,13 +428,19 @@ class GroSystem:
             name = residue_stack[0].name
             if name not in self._index_residues_stack_by_name:
                 self._index_residues_stack_by_name[name] = []
-            self._index_residues_stack_by_name[name].append(residue_stack)
-            
+            self._index_residues_stack_by_name[name].append(residue_stack)           
 
     def select_residues_from_name(self, name, select_func, *kwargs):
         residues_to_look_at = self.get_residue_by_name(name)
         to_return = []
         for res in residues_to_look_at:
+            if select_func(res, *kwargs):
+                to_return.append(res)
+        return to_return
+    
+    def select_residues(self, select_func, *kwargs):
+        to_return = []
+        for res in self.residues:
             if select_func(res, *kwargs):
                 to_return.append(res)
         return to_return
@@ -489,7 +499,7 @@ class GroSystem:
                             o.write(f'{ion} {nb} \n')
                 else:
                     o.write(f'{residue_stack[0].name} {len(residue_stack)}\n')  
-        logger.debug(f'System top file written in {top_path}') 
+        logger.info(f'System top file written in {top_path}') 
 
     def write_itp(self, itp_path):
         should_be_handled_part = ['atoms', 'bonds', 'angles', 'dihedrals']

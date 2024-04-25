@@ -33,6 +33,12 @@ class Atom:
     def set_z(self, z):
         self.coordinates[2] = z
 
+    def set_x(self, x):
+        self.coordinates[0] = x
+
+    def set_y(self, y):
+        self.coordinates[1] = y
+
     def register_bond(self, bond):
         self.bonds.append(bond)
     
@@ -110,6 +116,12 @@ class Atom:
             else:
                 neighbors.append(b.atom1)
         return neighbors
+    
+    def get_bond(self, other_atom):
+        for b in self.bonds:
+            if b.atom1 == other_atom or b.atom2 == other_atom:
+                return b
+        
 
 
 
@@ -176,6 +188,17 @@ class Dihedral:
         self.atom2.delete_one_dihedral(self)
         self.atom3.delete_one_dihedral(self)
         self.atom4.delete_one_dihedral(self)
+
+    def register_itp(self, funct, angle, force):
+        self.itp_info['i'] = str(self.atom1.number)
+        self.itp_info['j'] = str(self.atom2.number)
+        self.itp_info['k'] = str(self.atom3.number)
+        self.itp_info['l'] = str(self.atom4.number)
+        self.itp_info['funct'] = str(funct)
+        self.itp_info['ref.angle'] = str(angle)
+        self.itp_info['force_k'] = str(force)
+
+
 
 
 class MissingItpDescription(Exception):

@@ -343,7 +343,7 @@ class GroSystem:
 
         # Shift existing residues and their atom numbers to accommodate the new residue
         for res in self._residues[residue.idx:]:
-            print('res to shift', res)
+            # print('res to shift', res)
             self._clear_from_index_resnum(res)
             res.number = add_to_gro_number(res.number, 1)
             self._add_to_index_resnum(res)
@@ -562,6 +562,18 @@ class GroSystem:
     
     def _clear_from_index_atomnum(self, atom):
         del self._index_by_atomnumber[atom.number]
+
+    def redo_index_resname(self):
+        self._index_by_residue_name = {}
+        for res in self.residues:
+            if res.name not in self._index_by_residue_name: 
+                self._index_by_residue_name[res.name] = []
+            self._index_by_residue_name[res.name].append(res)
+
+    def redo_residue_stack_from_index_resname(self):
+        self._residues_stack = []
+        for residues in self._index_by_residue_name.values():
+            self._residues_stack.append(residues)
 
 
 

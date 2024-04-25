@@ -72,7 +72,7 @@ class Residue:
         """
         return max([atom.coordinates[2] for atom in self.atoms])
     
-    def copy(self):
+    def copy(self, offset=0.21):
         """
         Method: copy
 
@@ -116,13 +116,14 @@ class Residue:
         # The new Atom objects are not connected to the original Atom objects.
         for atom in self.atoms:
             new_coords = atom.coordinates[:]
-            new_coords[0] = round(new_coords[0] + 0.21, 3) # Adjust X-coordinate by adding 0.21 (vdW radius).
+            new_coords[0] = round(new_coords[0] + offset, 3) # Adjust X-coordinate by adding 0.21 (vdW radius).
             # Create a new Atom object and add it to the new residue's 'atoms' list.
             new_residue.add_atom(atom.name, new_atom_number, new_coords, atom.velocities)
             new_atom_number = add_to_gro_number(new_atom_number, 1)
         
         # Insert the new Residue into the molecular system using the 'insert_residue' method.
         self.system.insert_residue(new_residue)
+        return new_residue
 
     def change_coordinates(self, new_coords):
         """
@@ -173,3 +174,7 @@ class Residue:
         logger.debug(f'I want to delete <{self}>')
         self.system.delete_residue(self)
 
+    def change_name(self, new_name):
+        self.name = new_name
+        self.system.redo_index_resname()
+        self.system.redo_residue_stack_from_index_resname()

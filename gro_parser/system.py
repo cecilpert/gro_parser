@@ -449,7 +449,7 @@ class GroSystem:
         with open(gro_path, 'w') as o:
             o.write(f'{self.name}\n') # Write the system name as the first line in the .gro file
             o.write(f' {len(self.atoms)}\n') # Write the total number of atoms as the second line
-            for res in self.residues: # Iterate through all residues in the system
+            for res in [res for res_stack in self._residues_stack for res in res_stack]: # Iterate through all residues in the system
                 for atom in res.atoms: # Iterate through all atoms in each residue
                     # Format the atom data for the .gro file
                     _resnum_char = len(str(res.number))
@@ -472,6 +472,7 @@ class GroSystem:
                             velocities_str += ' ' * (8 - _vel_char) + str(vel)
                     # Write the formatted atom data to the .gro file
                     o.write(f'{resnumber}{resname}{atomname}{atomnum}{coords_str}{velocities_str}\n')
+
             o.write(f' {" ".join([str(val) for val in self.box_vectors])}\n') # Write box vectors at the end
         logger.info(f'System gro file written in {gro_path}')
     

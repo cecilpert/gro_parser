@@ -16,7 +16,12 @@ class Residue:
     def add_atom(self, name, number, coordinates, velocities):
         atom = Atom(name, number, coordinates, velocities, self)
         self.atoms.append(atom)
+        self.system._register_atom_in_index(atom)
         return atom
+    
+    def add_atom_object(self, atom_object):
+        self.atoms.append(atom_object)
+        self.system._register_atom_in_index(atom_object)
 
     @property
     def min_x(self):

@@ -1,3 +1,4 @@
+import copy
 class Atom:
     def __init__(self, name: str, number: int, coordinates, velocities, residue):
         self.name = name
@@ -25,8 +26,18 @@ class Atom:
     def z(self):
         return self.coordinates[2]
     
+    @property
+    def type(self):
+        return self.itp_info.get('type')
+    
     def set_z(self, z):
         self.coordinates[2] = z
+
+    def set_x(self, x):
+        self.coordinates[0] = x
+
+    def set_y(self, y):
+        self.coordinates[1] = y
 
     def register_bond(self, bond):
         self.bonds.append(bond)
@@ -53,14 +64,66 @@ class Atom:
     def delete_one_dihedral(self, d):
         self.dihedrals.remove(d) 
 
+    def delete_all_bonds(self):
+        copied_bonds = self.bonds[:]
+        for bond in copied_bonds:
+            bond.delete()
+
     def comment_all_dihedrals(self):
         for d in self.dihedrals:
             d.comment = True
+
+    def delete_all_relations(self):
+        self.delete_all_bonds()
+        self.delete_all_angles()
+        self.delete_all_dihedrals()
 
     def change_atomtype(self, atomtype):
         if 'type' not in self.itp_info:
             raise MissingItpDescription('atom type')
         self.itp_info['type'] = atomtype
+
+    def copy(self):
+        new_atom = copy.deepcopy(self)
+        new_atom.residue = self.residue
+        return new_atom
+    
+    def set_name(self, name):
+        self.name = name
+        if 'atom' in self.itp_info:
+            self.itp_info['atom'] = name
+
+    def set_number(self, number):
+        self.number = number
+        if 'nr' in self.itp_info:
+            self.itp_info['nr'] = str(number)
+    
+    def set_charge_group_number(self, number):
+        if 'cgnr' in self.itp_info:
+            self.itp_info['cgnr'] = str(number)
+
+    def increase_x(self, by):
+        self.coordinates[0] += by
+    
+    def increase_y(self, by):
+        self.coordinates[1] += by
+
+    def get_neighbors_through_bond(self):
+        neighbors = []
+        for b in self.bonds:
+            if b.atom1 == self:
+                neighbors.append(b.atom2)
+            else:
+                neighbors.append(b.atom1)
+        return neighbors
+    
+    def get_bond(self, other_atom):
+        for b in self.bonds:
+            if b.atom1 == other_atom or b.atom2 == other_atom:
+                return b
+        
+
+
 
 class Bond:
     def __init__(self, atom1:Atom, atom2: Atom, length: float, comment: bool = False):
@@ -76,6 +139,17 @@ class Bond:
     def set_length(self, length):
         self.length = length
         self.itp_info['length'] = str(length)
+
+    def delete(self):
+        self.atom1.bonds.remove(self)
+        self.atom2.bonds.remove(self)
+
+    def register_itp(self, funct, kb):
+        self.itp_info['i'] = str(self.atom1.number)
+        self.itp_info['j'] = str(self.atom2.number)
+        self.itp_info['length'] = str(self.length)
+        self.itp_info['funct'] = str(funct)
+        self.itp_info['kb'] = str(kb)
 
 
 class Angle:
@@ -114,6 +188,17 @@ class Dihedral:
         self.atom2.delete_one_dihedral(self)
         self.atom3.delete_one_dihedral(self)
         self.atom4.delete_one_dihedral(self)
+
+    def register_itp(self, funct, angle, force):
+        self.itp_info['i'] = str(self.atom1.number)
+        self.itp_info['j'] = str(self.atom2.number)
+        self.itp_info['k'] = str(self.atom3.number)
+        self.itp_info['l'] = str(self.atom4.number)
+        self.itp_info['funct'] = str(funct)
+        self.itp_info['ref.angle'] = str(angle)
+        self.itp_info['force_k'] = str(force)
+
+
 
 
 class MissingItpDescription(Exception):

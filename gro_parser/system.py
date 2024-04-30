@@ -573,6 +573,18 @@ class GroSystem:
     def _clear_from_index_atomnum(self, atom):
         del self._index_by_atomnumber[atom.number]
 
+    def redo_index_resname(self):
+        self._index_by_residue_name = {}
+        for res in self.residues:
+            if res.name not in self._index_by_residue_name: 
+                self._index_by_residue_name[res.name] = []
+            self._index_by_residue_name[res.name].append(res)
+
+    def redo_residue_stack_from_index_resname(self):
+        self._residues_stack = []
+        for residues in self._index_by_residue_name.values():
+            self._residues_stack.append(residues)
+
 
 
 class GroParsingException(Exception):

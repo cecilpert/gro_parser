@@ -545,10 +545,12 @@ class GroSystem:
                         for atom in self.atoms:
                            for angle in atom.angles:
                                 if angle not in written_angles: 
-                                    line = "\t".join(angle.itp_info[col] for col in header) + '\n'
+                                    line = "\t".join(angle.itp_info[col] for col in header)
                                     if angle.comment:
                                         line = ";" + line
-                                    itp.write(line)
+                                    if angle.comment_str:
+                                        line = line + " ;" + angle.comment_str
+                                    itp.write(line + "\n")
                                     written_angles.append(angle)
 
                     if part == "dihedrals":

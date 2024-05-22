@@ -167,13 +167,13 @@ class Bond:
         self.itp_info['kb'] = str(kb)
 
 
-class Angle:
+class Angle(ItpPart):
     def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, comment: bool = False):
+        super().__init__('angles', comment)
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3
         self.itp_info = {}
-        self.comment = comment
 
     def __repr__(self):
         return f'Angle btw {self.atom1.name} {self.atom2.name} {self.atom3.name}'
@@ -185,6 +185,14 @@ class Angle:
 
     def set_angle_value(self, value):
         self.itp_info['angle'] = str(value)
+
+    def register_itp(self, funct, angle_value, force):
+        self.itp_info['i'] = str(self.atom1.number)
+        self.itp_info['j'] = str(self.atom2.number)
+        self.itp_info['k'] = str(self.atom3.number)
+        self.itp_info['funct'] = str(funct)
+        self.itp_info['angle'] = str(angle_value)
+        self.itp_info['force_k'] = str(force)
     
 class Dihedral(ItpPart):
     def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom, comment : bool = False):

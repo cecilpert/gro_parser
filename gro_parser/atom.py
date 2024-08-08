@@ -1,4 +1,21 @@
 import copy
+
+class ItpPart:
+    def __init__(self, type, comment: bool = False):
+        self.itp_info = {}
+        self.type = type
+        self.comment = comment
+        self.comment_str = None
+
+    def add_itp_column(self, column, value):
+        self.itp_info[column] = value
+        system = self.atom1.residue.system
+        if column not in system.itp_headers[self.type]:
+            system.itp_headers[self.type].append(column)
+
+    def add_a_comment(self, comment):
+        self.comment_str = comment
+    
 class Atom:
     def __init__(self, name: str, number: int, coordinates, velocities, residue):
         self.name = name
@@ -123,8 +140,6 @@ class Atom:
                 return b
         
 
-
-
 class Bond:
     def __init__(self, atom1:Atom, atom2: Atom, length: float, comment: bool = False):
         self.atom1 = atom1
@@ -171,14 +186,15 @@ class Angle:
     def set_angle_value(self, value):
         self.itp_info['angle'] = str(value)
     
-class Dihedral:
+class Dihedral(ItpPart):
     def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom, comment : bool = False):
+        super().__init__('dihedrals', comment)
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3
         self.atom4 = atom4
-        self.itp_info = {}
-        self.comment = comment
+        #self.itp_info = {}
+        #self.comment = comment
     
     def __repr__(self):
         return f'Dihedral btw {self.atom1.name} {self.atom2.name} {self.atom3.name} {self.atom4.name}'
@@ -199,9 +215,14 @@ class Dihedral:
         self.itp_info['force_k'] = str(force)
 
 
-
-
 class MissingItpDescription(Exception):
     def __init__(self, missing_thing):
         message = f'{missing_thing} is not described in itp file'
         super().__init__(message)
+
+
+# ITP_PARAMETERS = {
+#     'dihedrals' :  {
+#         (4, 'periodic improper dihedrals') : ['angle', 'k', 'multiplicity']
+#     }
+# }

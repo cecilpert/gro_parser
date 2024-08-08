@@ -24,6 +24,7 @@ class GroSystem:
         self._residues_stack = []
         self._index_residues_stack_by_name = {}
         self.itp_info = {}
+        self.itp_headers = {}
         logger.info(f'Load gromacs system with gro_parser')
         logger.debug(f'Read gro file : {gro_file}')
         self._parse(gro_file)
@@ -39,6 +40,7 @@ class GroSystem:
         self._min_x = None
         self._min_y = None
         self._min_z = None
+
         
 
     @property
@@ -197,18 +199,27 @@ class GroSystem:
             logger.debug('Your force field seems to be martini')
 
     def _parse_itp(self, itp_file):
+        current_cat_line = 0
         with open(itp_file) as f:
             current_category = 'header'
+            line_idx = 0
             for l in f:
+                line_idx += 1
                 l = l.strip().rstrip('\n')
                 if l != '':
                     if l.startswith('['):
+                        current_cat_line = line_idx
                         current_category = l.replace('[', '').replace(']', '').strip()
                     else:
-                    
                         if current_category not in self.itp_info:
                             self.itp_info[current_category] = []
+                            self.itp_headers[current_category] = []
+                        if l.startswith(';') and line_idx == current_cat_line + 1:
+                            for col in l.lstrip(';').split():
+                                self.itp_headers[current_category].append(col)
+                        
                         self.itp_info[current_category].append(l.rstrip('\n'))
+        
         self._try_to_populate_atom_with_itp()
         
         self._register_itp_relation('bonds', ['i', 'j'])
@@ -514,8 +525,8 @@ class GroSystem:
                     itp.write('; system loaded with gro_parser\n;\n')
                 elif part in should_be_handled_part:
                     itp.write(f'[ {part} ]\n')
-                    header = self.itp_info[part][0].lstrip(';').split()
-                    itp.write(self.itp_info[part][0] + '\n')
+                    header = self.itp_headers[part]
+                    itp.write(f'; {"\t".join(header)}\n')
                     
                     if part == 'atoms':
                         for atom in self.atoms:
@@ -547,10 +558,12 @@ class GroSystem:
                         for atom in self.atoms:
                            for d in atom.dihedrals:
                                 if d not in written_dihedrals: 
-                                    line = "\t".join(d.itp_info[col] for col in header) + '\n'
+                                    line = "\t".join(str(d.itp_info.get(col, ' ')) for col in header)
                                     if d.comment:
                                         line = ";" + line
-                                    itp.write(line)
+                                    if d.comment_str:
+                                        line = line + " ;" + d.comment_str
+                                    itp.write(line + "\n")
                                     written_dihedrals.append(d)
                             
                 else:

@@ -375,6 +375,8 @@ class GroSystem:
         for a in self.atoms:
             self._register_atom_in_index(a)
 
+        self.redo_residue_stack_from_index_resname()
+
     def delete_residue(self, residue):
         self._residues.remove(residue)
         self._index_by_residue_name[residue.name].remove(residue)
@@ -585,7 +587,6 @@ class GroSystem:
         self._residues_stack = []
         for residues in self._index_by_residue_name.values():
             self._residues_stack.append(residues)
-
 
 
 class GroParsingException(Exception):

@@ -30,3 +30,12 @@ def add_to_gro_number(number, to_add):
     if new_number >= 99999 :
         new_number = number - 99999
     return new_number
+
+def get_relation_params(header, funct, line):
+    other_params = header[funct]
+    other_params_idx = [header[funct].index(p) + len(header['default']) for p in other_params]
+    params = {}
+    for i in range(len(other_params)):
+        params[other_params[i]] = line[other_params_idx[i]]
+
+    return params

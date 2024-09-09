@@ -14,7 +14,11 @@ class ItpPart:
             system.itp_headers[self.type].append(column)
 
     def add_a_comment(self, comment):
-        self.comment_str = comment
+        
+        if self.comment_str and comment != self.comment_str:
+            self.comment_str += f' {comment}'
+        else:
+            self.comment_str = comment
     
 class Atom:
     def __init__(self, name: str, number: int, coordinates, velocities, residue):
@@ -23,11 +27,15 @@ class Atom:
         self.coordinates = coordinates
         self.velocities = velocities
         self.residue = residue
+        self.atom_type = None #from itp
+        self.charge_group_number = None #from itp
+        self.charge = None #from itp
+        self.mass = None #optionnal, from itp
         self.bonds = []
         self.angles = []
         self.dihedrals = []
-        self.itp_info = {}
-
+        self.in_itp = False
+        
     def __repr__(self):
         return f'{self.name} {self.number}'
     
@@ -45,7 +53,7 @@ class Atom:
     
     @property
     def type(self):
-        return self.itp_info.get('type')
+        return self.atom_type
     
     def set_z(self, z):
         self.coordinates[2] = z
@@ -96,9 +104,7 @@ class Atom:
         self.delete_all_dihedrals()
 
     def change_atomtype(self, atomtype):
-        if 'type' not in self.itp_info:
-            raise MissingItpDescription('atom type')
-        self.itp_info['type'] = atomtype
+        self.atom_type = atomtype
 
     def copy(self):
         new_atom = copy.deepcopy(self)
@@ -107,17 +113,12 @@ class Atom:
     
     def set_name(self, name):
         self.name = name
-        if 'atom' in self.itp_info:
-            self.itp_info['atom'] = name
-
+        
     def set_number(self, number):
         self.number = number
-        if 'nr' in self.itp_info:
-            self.itp_info['nr'] = str(number)
     
     def set_charge_group_number(self, number):
-        if 'cgnr' in self.itp_info:
-            self.itp_info['cgnr'] = str(number)
+        self.charge_group_number = number
 
     def increase_x(self, by):
         self.coordinates[0] += by
@@ -140,43 +141,46 @@ class Atom:
                 return b
         
 
-class Bond:
-    def __init__(self, atom1:Atom, atom2: Atom, length: float, comment: bool = False):
+class Bond(ItpPart):
+    def __init__(self, atom1:Atom, atom2: Atom, funct, other_params = {}, comment: bool = False):
+        super().__init__('bonds', comment)
         self.atom1 = atom1
         self.atom2 = atom2
-        self.length = length
-        self.itp_info = {}
-        self.comment = comment
+        self.funct = str(funct)
+        self.other_params = other_params
 
     def __repr__(self):
-        return f'Bond btw {self.atom1.name} {self.atom2.name}, length {self.length}'
+        return f'Bond btw {self.atom1.name} {self.atom2.name}'
     
     def set_length(self, length):
-        self.length = length
-        self.itp_info['length'] = str(length)
+        if not 'length' in self.other_params:
+            raise InvalidBondChange(self.funct, 'length')
+        
+        self.other_params['length'] = length
 
     def delete(self):
         self.atom1.bonds.remove(self)
         self.atom2.bonds.remove(self)
 
-    def register_itp(self, funct, kb):
-        self.itp_info['i'] = str(self.atom1.number)
-        self.itp_info['j'] = str(self.atom2.number)
-        self.itp_info['length'] = str(self.length)
-        self.itp_info['funct'] = str(funct)
-        self.itp_info['kb'] = str(kb)
+
+    @property
+    def length(self):
+        if not 'length' in self.other_params:
+            raise InvalidParameter(self.funct, 'length', 'bond')
+        return float(self.other_params['length'])
 
 
 class Angle(ItpPart):
-    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, comment: bool = False):
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, funct = None, other_params = {}, comment: bool = False):
         super().__init__('angles', comment)
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3
-        self.itp_info = {}
+        self.funct = str(funct)
+        self.other_params = other_params
 
     def __repr__(self):
-        return f'Angle btw {self.atom1.name} {self.atom2.name} {self.atom3.name}'
+        return f'Angle ({self.funct}) btw {self.atom1.name} {self.atom2.name} {self.atom3.name}'
     
     def delete(self):
         self.atom1.delete_one_angle(self)
@@ -184,26 +188,21 @@ class Angle(ItpPart):
         self.atom3.delete_one_angle(self)
 
     def set_angle_value(self, value):
-        self.itp_info['angle'] = str(value)
+        if not 'angle' in self.other_params:
+            raise InvalidAngleChange(self.funct, 'angle')
+        self.other_params['angle'] = value
 
-    def register_itp(self, funct, angle_value, force):
-        self.itp_info['i'] = str(self.atom1.number)
-        self.itp_info['j'] = str(self.atom2.number)
-        self.itp_info['k'] = str(self.atom3.number)
-        self.itp_info['funct'] = str(funct)
-        self.itp_info['angle'] = str(angle_value)
-        self.itp_info['force_k'] = str(force)
     
 class Dihedral(ItpPart):
-    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom, comment : bool = False):
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom, funct, other_params = {}, comment : bool = False):
         super().__init__('dihedrals', comment)
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3
         self.atom4 = atom4
-        #self.itp_info = {}
-        #self.comment = comment
-    
+        self.funct = str(funct)
+        self.other_params = other_params
+       
     def __repr__(self):
         return f'Dihedral btw {self.atom1.name} {self.atom2.name} {self.atom3.name} {self.atom4.name}'
     
@@ -213,19 +212,25 @@ class Dihedral(ItpPart):
         self.atom3.delete_one_dihedral(self)
         self.atom4.delete_one_dihedral(self)
 
-    def register_itp(self, funct, angle, force):
-        self.itp_info['i'] = str(self.atom1.number)
-        self.itp_info['j'] = str(self.atom2.number)
-        self.itp_info['k'] = str(self.atom3.number)
-        self.itp_info['l'] = str(self.atom4.number)
-        self.itp_info['funct'] = str(funct)
-        self.itp_info['ref.angle'] = str(angle)
-        self.itp_info['force_k'] = str(force)
-
 
 class MissingItpDescription(Exception):
     def __init__(self, missing_thing):
         message = f'{missing_thing} is not described in itp file'
+        super().__init__(message)
+
+class InvalidAngleChange(Exception):
+    def __init__(self, funct, param):
+        message = f"Impossible to modify {param} on angle funct {funct}, this parameter doesn't exist"
+        super().__init__(message)
+
+class InvalidBondChange(Exception):
+    def __init__(self, funct, param):
+        message = f"Impossible to modify {param} on bond funct {funct}, this parameter doesn't exist"
+        super().__init__(message)
+
+class InvalidParameter(Exception):
+    def __init__(self, funct, param, type):
+        message = f"Impossible to get {param} on {type} funct {funct}, this parameter doesn't exist"
         super().__init__(message)
 
 

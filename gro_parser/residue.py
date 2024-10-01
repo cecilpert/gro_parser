@@ -10,6 +10,7 @@ class Residue:
         self.number = number
         self.idx = idx
         self.atoms = []
+        self.in_itp = False
 
     def __repr__(self):
         return f"{self.name}{self.number} with {len(self.atoms)} atoms"
@@ -23,6 +24,10 @@ class Residue:
     def add_atom_object(self, atom_object):
         self.atoms.append(atom_object)
         self.system._register_atom_in_index(atom_object)
+    
+    def set_name(self, name):
+        self.name = name
+        
 
     @property
     def min_x(self):

@@ -1,0 +1,17 @@
+{
+    "atoms": ["atom_idx", "atom_type", "residue_number", "residue_name", "atom_name", "charge_group_number", "charge", "mass"],
+    "angles" : {
+        "default" : ["i", "j", "k", "funct"],
+        "1" : ["angle", "k0"]
+    },
+    "bonds" : {
+        "default" : ["i", "j", "funct"],
+        "1" : ["length", "kb"]
+    },
+    "dihedrals" : {
+        "default" : ["i", "j", "k", "l", "funct"],
+        "2" : ["ref_angle", "force"],
+        "4" : ["ref_angle", "force", "multiplicity"]
+    }
+        
+}

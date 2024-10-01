@@ -1,6 +1,7 @@
 from .atom import Atom
 from .base_logger import logger
 from .utils import add_to_gro_number
+import numpy as np
 
 class Residue:
     def __init__(self, number: int, name: str, idx, system):
@@ -188,3 +189,9 @@ class Residue:
         self.name = new_name
         self.system.redo_index_resname()
         self.system.redo_residue_stack_from_index_resname()
+
+    def get_coordinates(self):
+        coords = []
+        for atom in self.atoms:
+            coords.append(atom.coordinates)
+        return np.array(coords)

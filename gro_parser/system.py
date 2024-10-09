@@ -514,6 +514,8 @@ class GroSystem:
         for a in self.atoms:
             self._register_atom_in_index(a)
 
+        self.redo_residue_stack_from_index_resname()
+
     def delete_residue(self, residue):
         self._residues.remove(residue)
         self._index_by_residue_name[residue.name].remove(residue)
@@ -747,8 +749,6 @@ class GroSystem:
         for residues in self._index_by_residue_name.values():
             self._residues_stack.append(residues)
 
-
-
 def check_itp_atom(itp_line, system_atom):
     atom_desc = ITP_DESC['atoms']
     atom_name_idx = atom_desc.index('atom_name')
@@ -775,8 +775,6 @@ def check_itp_atom(itp_line, system_atom):
         return False
 
     return True
-
-    
 
 class GroParsingException(Exception):
     pass

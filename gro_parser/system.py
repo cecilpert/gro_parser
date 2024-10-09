@@ -14,7 +14,7 @@ source_dir = source_path.parent
 
 logger.setLevel(logging.INFO)
 
-GRO_LINE_REGEX = '^([\d ]{5})([\w ]{5})([\w ]{5})([\d ]{5})([\d. -]{8})([\d. -]{8})([\d. -]{8})(([\d. -]{8})([\d. -]{8})([\d. -]{8}))?'
+GRO_LINE_REGEX = '^([\d ]{5})([\w ]{5})([\w+|\- ]{5})([\d ]{5})([\d. -]{8})([\d. -]{8})([\d. -]{8})(([\d. -]{8})([\d. -]{8})([\d. -]{8}))?'
 
 ITP_DESC = json.load(open(f'{source_dir}/itp_description.json'))
 
@@ -375,10 +375,11 @@ class GroSystem:
             system_atom.charge = charge
             try: 
                 mass = float(itp_atom[mass_idx])
+                system_atom.mass = mass
             except ValueError:
                 print(f'[atoms] : no mass column')
             
-            system_atom.mass = mass
+            
 
             system_atom.in_itp = True
             system_atom.residue.in_itp = True
@@ -432,7 +433,7 @@ class GroSystem:
             
 
             funct = line[funct_idx]
-            other_params = get_relation_params(header, funct, line)
+            other_params = get_relation_params(header, funct, line, part_to_check)
 
             if part_to_check == 'bonds':
                 link_obj = Bond(*atoms, funct, other_params, comment = register_comment)
@@ -702,7 +703,7 @@ class GroSystem:
                                         line = f'{rel.atom1.number}\t{rel.atom2.number}\t{rel.atom3.number}\t{rel.funct}'
                                     elif part == "dihedrals":
                                         line = f'{rel.atom1.number}\t{rel.atom2.number}\t{rel.atom3.number}\t{rel.atom4.number}\t{rel.funct}'
-                                    for other_param in header_funct:
+                                    for other_param in header_funct['params']:
                                         line += f'\t{rel.other_params[other_param]}'
                                     if rel.comment:
                                         line = ";" + line

@@ -31,9 +31,13 @@ def add_to_gro_number(number, to_add):
         new_number = number - 99999
     return new_number
 
-def get_relation_params(header, funct, line):
-    other_params = header[funct]
-    other_params_idx = [header[funct].index(p) + len(header['default']) for p in other_params]
+def get_relation_params(header, funct, line, relation_type):
+    is_registered = header.get(funct, False)
+    if not is_registered:
+        raise Exception(f"{funct} funct is not registered for {relation_type}")
+    
+    other_params = header[funct]["params"]
+    other_params_idx = [other_params.index(p) + len(header['default']) for p in other_params]
     params = {}
     for i in range(len(other_params)):
         params[other_params[i]] = line[other_params_idx[i]]

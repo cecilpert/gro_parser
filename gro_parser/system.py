@@ -418,8 +418,17 @@ class GroSystem:
                 register_comment = True
             else: 
                 register_comment = False
+            
+            line = line.lstrip(';')
+            maybe_comment = line.split(';')
 
-            line = line.lstrip(';').split()
+            # register comments at the end of line
+            if len(maybe_comment) > 1:
+                comment = maybe_comment[1]
+            else:
+                comment = None
+                
+            line = maybe_comment[0].split()
             
             atoms = []
             for atom_idx in col_idx:
@@ -436,17 +445,17 @@ class GroSystem:
             other_params = get_relation_params(header, funct, line, part_to_check)
 
             if part_to_check == 'bonds':
-                link_obj = Bond(*atoms, funct, other_params, comment = register_comment)
+                link_obj = Bond(*atoms, funct, other_params, comment = register_comment, comment_str = comment)
                 for atom in atoms:
                     atom.register_bond(link_obj)
             
             if part_to_check == "angles":
-                link_obj = Angle(*atoms, funct, other_params, comment = register_comment)
+                link_obj = Angle(*atoms, funct, other_params, comment = register_comment, comment_str = comment)
                 for atom in atoms:
                     atom.register_angle(link_obj)
 
             if part_to_check == "dihedrals":
-                link_obj = Dihedral(*atoms, funct, other_params, comment = register_comment)
+                link_obj = Dihedral(*atoms, funct, other_params, comment = register_comment, comment_str = comment)
                 for atom in atoms:
                     atom.register_dihedral(link_obj)
 
@@ -695,7 +704,7 @@ class GroSystem:
                         written_relation = []
                         for rel_funct, relations in browsed_relations:
                             header_funct = ITP_DESC[part][str(rel_funct)]
-                            header_funct_str = "\t".join(header_funct)
+                            header_funct_str = "\t".join(header_funct['params'])
                             itp.write(f";{header_default_str}\t{header_funct_str}\n")
                             for rel in relations:
                                 if rel not in written_relation: 

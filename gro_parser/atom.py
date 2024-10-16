@@ -1,11 +1,11 @@
 import copy
 
 class ItpPart:
-    def __init__(self, type, comment: bool = False):
+    def __init__(self, type, comment: bool = False, comment_str = None):
         self.itp_info = {}
         self.type = type
         self.comment = comment
-        self.comment_str = None
+        self.comment_str = comment_str
 
     def add_itp_column(self, column, value):
         self.itp_info[column] = value
@@ -142,8 +142,8 @@ class Atom:
         
 
 class Bond(ItpPart):
-    def __init__(self, atom1:Atom, atom2: Atom, funct, other_params = {}, comment: bool = False):
-        super().__init__('bonds', comment)
+    def __init__(self, atom1:Atom, atom2: Atom, funct, other_params = {}, comment: bool = False, comment_str = None):
+        super().__init__('bonds', comment, comment_str)
         self.atom1 = atom1
         self.atom2 = atom2
         self.funct = str(funct)
@@ -171,8 +171,8 @@ class Bond(ItpPart):
 
 
 class Angle(ItpPart):
-    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, funct = None, other_params = {}, comment: bool = False):
-        super().__init__('angles', comment)
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, funct = None, other_params = {}, comment: bool = False, comment_str = None):
+        super().__init__('angles', comment, comment_str)
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3
@@ -194,8 +194,8 @@ class Angle(ItpPart):
 
     
 class Dihedral(ItpPart):
-    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom, funct, other_params = {}, comment : bool = False):
-        super().__init__('dihedrals', comment)
+    def __init__(self, atom1: Atom, atom2: Atom, atom3: Atom, atom4: Atom, funct, other_params = {}, comment : bool = False, comment_str = None):
+        super().__init__('dihedrals', comment, comment_str)
         self.atom1 = atom1 
         self.atom2 = atom2
         self.atom3 = atom3

@@ -524,7 +524,8 @@ class GroSystem:
                 elif part in should_be_handled_part:
                     itp.write(f'[ {part} ]\n')
                     header = self.itp_headers[part]
-                    itp.write(f'; {"\t".join(header)}\n')
+                    header_line = "\t".join(header)
+                    itp.write(f'; {header_line}\n')
                     
                     if part == 'atoms':
                         for atom in self.atoms:

@@ -679,6 +679,10 @@ class GroSystem:
                     itp.write(f'{self.mol_name_in_itp} 1\n\n')
                 elif part in should_be_handled_part:
                     itp.write(f'[ {part} ]\n')
+                    header = self.itp_headers[part]
+                    header_line = "\t".join(header)
+                    itp.write(f'; {header_line}\n')
+                    
                     if part == 'atoms':
                         header = ITP_DESC[part]
                         header_str = "\t".join(header)
